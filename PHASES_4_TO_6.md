@@ -10,8 +10,6 @@ streamlit run app.py
 
 儀表板包含三個頁籤：地區預報、全台氣溫地圖與農業警示。地圖可依資料庫內的日期切換，並依最高溫顯示藍、綠、橘、紅色標記。
 
-新版首頁採用深色全螢幕地圖風格，提供縣市氣溫色階、溫度標籤、測站點位、深色／街道底圖、瀏覽器定位與全螢幕控制。縣市界線取自 [g0v/twgeojson](https://github.com/g0v/twgeojson)，依其 CC0 1.0 授權使用，並已簡化以改善網頁載入速度。
-
 ## AI 旅遊與穿搭建議
 
 未設定 `OPENAI_API_KEY` 時會自動使用離線規則，不影響儀表板操作。若要使用 OpenAI Responses API，請複製 `.env.example` 的變數到 `.env`，填入金鑰；目前預設使用 `gpt-6-luna`，可透過 `OPENAI_MODEL` 更換。

@@ -15,10 +15,10 @@ class WeatherFeatureTests(unittest.TestCase):
         ])
 
     def test_temperature_colors(self):
-        self.assertEqual(temperature_color(19), "#2c7bb6")
-        self.assertEqual(temperature_color(22), "#7fcdbb")
-        self.assertEqual(temperature_color(28), "#fdae61")
-        self.assertEqual(temperature_color(31), "#d73027")
+        self.assertEqual(temperature_color(19), "blue")
+        self.assertEqual(temperature_color(22), "green")
+        self.assertEqual(temperature_color(28), "orange")
+        self.assertEqual(temperature_color(31), "red")
 
     def test_date_filter(self):
         dates = available_dates(self.data)
@@ -39,7 +39,6 @@ class WeatherFeatureTests(unittest.TestCase):
         rendered = build_temperature_map(self.data).get_root().render()
         self.assertIn("臺北市", rendered)
         self.assertIn("高雄市", rendered)
-        self.assertIn("display_name", rendered)
 
 
 if __name__ == "__main__":
