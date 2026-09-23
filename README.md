@@ -9,6 +9,17 @@
 [![CWA OpenData](https://img.shields.io/badge/Data%20Source-CWA%20API-00A4E4.svg)](https://opendata.cwa.gov.tw/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+## 🔗 專案連結
+
+- [GitHub 儲存庫：john19991225-commits/0923](https://github.com/john19991225-commits/0923)
+- 本機啟動網址：[http://localhost:8501](http://localhost:8501)
+
+> `localhost` 僅能在已啟動本專案的電腦上開啟。
+
+## 🖼️ 系統畫面
+
+![台灣即時氣象地圖儀表板](docs/weather-dashboard.png)
+
 ---
 
 ## 📖 專案簡介 (Overview)
