@@ -12,6 +12,7 @@ ENV/
 # SQLite
 *.db-journal
 data/*.db
+data/live_weather_cache.json
 
 # IDE & OS
 .vscode/
