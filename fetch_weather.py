@@ -149,6 +149,32 @@ def get_mock_weather_data() -> Dict[str, Any]:
     }
 
 
+def load_api_key_from_env() -> str:
+    """從環境變數或 .env 檔案中自動讀取 CWA_API_KEY"""
+    key = os.environ.get("CWA_API_KEY", "").strip()
+    if key:
+        return key
+
+    candidate_paths = [
+        os.path.join(os.path.dirname(__file__), ".env"),
+        os.path.join(os.path.dirname(__file__), "myplan", ".env"),
+        ".env"
+    ]
+    for p in candidate_paths:
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith("CWA_API_KEY="):
+                            return line.split("=", 1)[1].strip().strip('"').strip("'")
+                        elif line.startswith("CWA-"):
+                            return line
+            except Exception:
+                pass
+    return ""
+
+
 def fetch_cwa_weather_json(api_key: Optional[str] = None) -> Dict[str, Any]:
     """
     【步驟 4】API 資料取得
@@ -156,7 +182,7 @@ def fetch_cwa_weather_json(api_key: Optional[str] = None) -> Dict[str, Any]:
     若無提供 API Key 或網路異常，則自動切換為展示資料。
     """
     if not api_key:
-        api_key = os.environ.get("CWA_API_KEY", "").strip()
+        api_key = load_api_key_from_env()
 
     if not api_key:
         print("[資訊] 未偵測到 CWA_API_KEY 環境變數，切換至「離線展示資料模式」。")
