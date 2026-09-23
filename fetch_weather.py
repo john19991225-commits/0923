@@ -280,14 +280,179 @@ def print_extracted_data(records: List[Dict[str, Any]]) -> None:
     print(f"總計成功解析 {len(records)} 筆結構化氣象資料。\n")
 
 
+# =======================================================================
+# 第二階段 (Phase 2) - 資料清洗與 SQLite 資料庫儲存
+# 對應步驟：
+#   - 步驟 7: 資料整理與預覽 (使用 Pandas 觀察資料)
+#   - 步驟 8: 建立 SQLite 資料庫 (儲存氣溫資料)
+#   - 步驟 9: 資料庫設計 (TemperatureForecasts 資料表與 UNIQUE 約束)
+#   - 步驟 10: 查詢資料驗證 (使用 SQL 檢查資料)
+#   - 步驟 20: 程式碼品質與優化 (防重複插入機制)
+# =======================================================================
+
+import sqlite3
+
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
+
+DB_DIR = os.path.join(os.path.dirname(__file__), "data")
+DB_PATH = os.path.join(DB_DIR, "data.db")
+
+
+def records_to_dataframe(records: List[Dict[str, Any]]) -> Any:
+    """
+    【步驟 7】資料整理與預覽
+    使用 Pandas 將萃取的氣溫資料轉為結構化 DataFrame，並進行排序與清洗檢視。
+    """
+    if pd is None:
+        print("[警告] 尚未安裝 pandas 套件，跳過 DataFrame 轉換。")
+        return None
+
+    df = pd.DataFrame(records)
+    if not df.empty:
+        df["mint"] = pd.to_numeric(df["mint"], errors="coerce")
+        df["maxt"] = pd.to_numeric(df["maxt"], errors="coerce")
+        df = df.sort_values(by=["regionName", "dataDate"]).reset_index(drop=True)
+
+    print("\n" + "=" * 55)
+    print(" 📊  步驟 7：使用 Pandas 觀察與預覽氣溫資料")
+    print("=" * 55)
+    print("資料前 5 筆預覽 (df.head())：")
+    print(df.head())
+    print("\n氣溫統計描述 (df[['mint', 'maxt']].describe())：")
+    print(df[["mint", "maxt"]].describe())
+    return df
+
+
+def init_database(db_path: str = DB_PATH) -> sqlite3.Connection:
+    """
+    【步驟 8 & 9】建立 SQLite 資料庫與 Schema 設計
+    建立 data/ 目錄與 data.db，創建 TemperatureForecasts 資料表。
+    使用 UNIQUE(regionName, dataDate) 配合 INSERT OR REPLACE 保證重複執行不重複插入 (步驟 20 優化)。
+    """
+    db_folder = os.path.dirname(db_path)
+    if db_folder and not os.path.exists(db_folder):
+        os.makedirs(db_folder, exist_ok=True)
+        print(f"[目錄] 已自動建立資料庫目錄: {db_folder}")
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    create_table_sql = """
+    CREATE TABLE IF NOT EXISTS TemperatureForecasts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        regionName TEXT NOT NULL,
+        dataDate TEXT NOT NULL,
+        mint REAL NOT NULL,
+        maxt REAL NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(regionName, dataDate)
+    );
+    """
+    cursor.execute(create_table_sql)
+    conn.commit()
+    print(f"[資料庫] 成功連接並初始化資料庫: {db_path}")
+    print("[資料庫] 資料表 TemperatureForecasts 結構確認就緒。")
+    return conn
+
+
+def save_to_database(records_or_df: Any, db_path: str = DB_PATH) -> int:
+    """
+    【步驟 8 & 20】插入氣溫資料（防重複插入 UPSERT 機制）
+    使用 INSERT OR REPLACE INTO 語法，當相同地區與相同日期再次寫入時自動更新，
+    不會產生重複的髒資料。
+    """
+    conn = init_database(db_path)
+    cursor = conn.cursor()
+
+    # 若傳入的是 DataFrame 轉成 records，否則直接使用 list
+    if pd is not None and isinstance(records_or_df, pd.DataFrame):
+        rows = records_or_df[["regionName", "dataDate", "mint", "maxt"]].values.tolist()
+    elif isinstance(records_or_df, list):
+        rows = [(r["regionName"], r["dataDate"], r["mint"], r["maxt"]) for r in records_or_df]
+    else:
+        print("[錯誤] 無效的資料格式，無法寫入資料庫。")
+        conn.close()
+        return 0
+
+    upsert_sql = """
+    INSERT OR REPLACE INTO TemperatureForecasts (regionName, dataDate, mint, maxt)
+    VALUES (?, ?, ?, ?);
+    """
+    cursor.executemany(upsert_sql, rows)
+    conn.commit()
+    inserted_count = len(rows)
+    conn.close()
+
+    print(f"[寫入] 成功儲存 {inserted_count} 筆氣溫記錄至 SQLite 資料庫 ({db_path})！")
+    return inserted_count
+
+
+def verify_database(db_path: str = DB_PATH) -> None:
+    """
+    【步驟 10】查詢資料驗證 (使用 SQL 檢查資料)
+    執行課程指定 SQL 驗證指令：
+      1. SELECT DISTINCT regionName FROM TemperatureForecasts;
+      2. SELECT * FROM TemperatureForecasts WHERE regionName = '...';
+      3. 總筆數統計
+    """
+    if not os.path.exists(db_path):
+        print(f"[錯誤] 資料庫檔案不存在: {db_path}")
+        return
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    print("\n" + "=" * 55)
+    print(" 🔍  步驟 10：查詢資料驗證 (使用 SQL 檢查資料)")
+    print("=" * 55)
+
+    # 1. 統計總筆數
+    cursor.execute("SELECT COUNT(*) FROM TemperatureForecasts;")
+    total_count = cursor.fetchone()[0]
+    print(f"[SQL 驗證 1] 總筆數查詢: 共 {total_count} 筆氣溫預報紀錄。")
+
+    # 2. 查詢所有不重複地區
+    cursor.execute("SELECT DISTINCT regionName FROM TemperatureForecasts ORDER BY regionName;")
+    distinct_regions = [row[0] for row in cursor.fetchall()]
+    print(f"[SQL 驗證 2] 收錄地區清單 ({len(distinct_regions)} 個地區)：")
+    print("      " + "、".join(distinct_regions[:10]) + ("..." if len(distinct_regions) > 10 else ""))
+
+    # 3. 示範條件查詢（例如北部、中部或特定縣市）
+    sample_region = distinct_regions[0] if distinct_regions else "中部地區"
+    cursor.execute(
+        "SELECT id, regionName, dataDate, mint, maxt FROM TemperatureForecasts WHERE regionName = ? ORDER BY dataDate;",
+        (sample_region,)
+    )
+    sample_rows = cursor.fetchall()
+    print(f"\n[SQL 驗證 3] 條件查詢示範 (WHERE regionName = '{sample_region}')：")
+    print(f"{'ID':<4} | {'地區':<8} | {'預報日期':<12} | {'最低溫 (MinT)':<10} | {'最高溫 (MaxT)':<10}")
+    print("-" * 55)
+    for row in sample_rows:
+        print(f"{row[0]:<4} | {row[1]:<8} | {row[2]:<12} | {row[3]:>6.1f} °C   | {row[4]:>6.1f} °C")
+
+    conn.close()
+    print("=" * 55 + "\n")
+
+
 if __name__ == "__main__":
-    print("=== 正在啟動第一階段：氣象資料 API 取得與 JSON 解析 ===")
-    
+    print("=== 正在啟動氣象資料管線 (Phase 1 & Phase 2) ===")
+
+    # ---------------- 階段一 ----------------
     # 步驟 4: 取得 JSON
     raw_json = fetch_cwa_weather_json()
-    
+
     # 步驟 5 & 6: 解析並萃取氣溫
     parsed_records = parse_and_extract_temperatures(raw_json)
-    
-    # 呈現結果
-    print_extracted_data(parsed_records)
+
+    # ---------------- 階段二 ----------------
+    # 步驟 7: Pandas 觀察與預覽
+    df_weather = records_to_dataframe(parsed_records)
+
+    # 步驟 8 & 9: 建立 SQLite 資料庫並寫入資料 (含重複執行不重複插入)
+    save_to_database(df_weather if df_weather is not None else parsed_records)
+
+    # 步驟 10: 執行 SQL 查詢驗證
+    verify_database()
