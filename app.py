@@ -91,7 +91,13 @@ def main() -> None:
     )
 
     map_state = st_folium(
-        build_temperature_map(daily_data, show_boundaries, show_labels, show_stations, dark_basemap),
+        build_temperature_map(
+            daily_data,
+            show_boundaries=show_boundaries,
+            show_labels=show_labels,
+            show_stations=show_stations,
+            dark_basemap=dark_basemap,
+        ),
         use_container_width=True, height=650, returned_objects=["last_object_clicked_tooltip"],
     )
     clicked = map_state.get("last_object_clicked_tooltip") if map_state else None
