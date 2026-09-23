@@ -21,46 +21,49 @@ def cached_weather_data(db_path: str) -> pd.DataFrame:
 
 def render_region_forecast(dataframe: pd.DataFrame) -> None:
     regions = sorted(dataframe["regionName"].unique().tolist())
-    selected_region = st.selectbox("選擇地區", regions)
+    selected_region = st.selectbox("選擇地區", regions, key="region_selector")
     region_data = dataframe.loc[dataframe["regionName"] == selected_region].copy()
     latest = region_data.sort_values("dataDate").iloc[-1]
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("最新最低溫", f"{latest['mint']:.1f} °C")
-    col2.metric("最新最高溫", f"{latest['maxt']:.1f} °C")
-    col3.metric("最新日溫差", f"{latest['maxt'] - latest['mint']:.1f} °C")
+    # 地區改變時使用不同容器 key，避免瀏覽器保留上一個地區的局部畫面。
+    with st.container(key=f"region-panel-{selected_region}"):
+        st.caption(f"目前顯示：{selected_region}")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("最新最低溫", f"{latest['mint']:.1f} °C")
+        col2.metric("最新最高溫", f"{latest['maxt']:.1f} °C")
+        col3.metric("最新日溫差", f"{latest['maxt'] - latest['mint']:.1f} °C")
 
-    st.subheader(f"{selected_region}氣溫趨勢")
-    chart_data = (
-        region_data.set_index("dataDate")[["maxt", "mint"]]
-        .rename(columns={"maxt": "最高溫", "mint": "最低溫"})
-        .sort_index()
-    )
-    st.line_chart(chart_data, color=["#E4572E", "#2E86AB"])
+        st.subheader(f"{selected_region}氣溫趨勢")
+        chart_data = (
+            region_data.set_index("dataDate")[["maxt", "mint"]]
+            .rename(columns={"maxt": "最高溫", "mint": "最低溫"})
+            .sort_index()
+        )
+        st.line_chart(chart_data, color=["#E4572E", "#2E86AB"])
 
-    st.subheader("預報明細")
-    table_data = region_data[["dataDate", "mint", "maxt"]].copy()
-    table_data["日溫差"] = table_data["maxt"] - table_data["mint"]
-    table_data["dataDate"] = table_data["dataDate"].dt.strftime("%Y-%m-%d")
-    table_data = table_data.rename(columns={"dataDate": "日期", "mint": "最低溫", "maxt": "最高溫"})
-    st.dataframe(
-        table_data, use_container_width=True, hide_index=True,
-        column_config={
-            "最低溫": st.column_config.NumberColumn(format="%.1f °C"),
-            "最高溫": st.column_config.NumberColumn(format="%.1f °C"),
-            "日溫差": st.column_config.NumberColumn(format="%.1f °C"),
-        },
-    )
+        st.subheader("預報明細")
+        table_data = region_data[["dataDate", "mint", "maxt"]].copy()
+        table_data["日溫差"] = table_data["maxt"] - table_data["mint"]
+        table_data["dataDate"] = table_data["dataDate"].dt.strftime("%Y-%m-%d")
+        table_data = table_data.rename(columns={"dataDate": "日期", "mint": "最低溫", "maxt": "最高溫"})
+        st.dataframe(
+            table_data, width="stretch", hide_index=True,
+            column_config={
+                "最低溫": st.column_config.NumberColumn(format="%.1f °C"),
+                "最高溫": st.column_config.NumberColumn(format="%.1f °C"),
+                "日溫差": st.column_config.NumberColumn(format="%.1f °C"),
+            },
+        )
 
-    st.subheader("AI 旅遊與穿搭建議")
-    st.caption("未設定 OPENAI_API_KEY 時，系統會使用內建規則產生建議。")
-    if st.button("產生建議", type="primary"):
-        try:
-            with st.spinner("正在整理建議..."):
-                advice = generate_ai_advice(selected_region, latest["mint"], latest["maxt"])
-            st.success(advice)
-        except Exception as exc:
-            st.error(f"AI 建議產生失敗：{exc}")
+        st.subheader("AI 旅遊與穿搭建議")
+        st.caption("未設定 OPENAI_API_KEY 時，系統會使用內建規則產生建議。")
+        if st.button("產生建議", type="primary", key=f"advice-{selected_region}"):
+            try:
+                with st.spinner("正在整理建議..."):
+                    advice = generate_ai_advice(selected_region, latest["mint"], latest["maxt"])
+                st.success(advice)
+            except Exception as exc:
+                st.error(f"AI 建議產生失敗：{exc}")
 
 
 def render_map(dataframe: pd.DataFrame) -> None:
