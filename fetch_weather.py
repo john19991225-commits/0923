@@ -16,6 +16,13 @@ import json
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
+# 設定標準輸出為 UTF-8 編碼，防止 Windows 命令提示字元 (CP950) 拋出 UnicodeEncodeError
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 try:
     import requests
 except ImportError:
